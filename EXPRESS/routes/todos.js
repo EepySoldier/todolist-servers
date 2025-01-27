@@ -35,9 +35,6 @@ router.post('/save', authenticateToken, (req, res) => {
                 return res.status(500).send('Error starting transaction');
             }
 
-
-            connection.query(`DELETE FROM todos WHERE UID = ?`, [UID]);
-
             todos.forEach(([todoName, done]) => {
                 connection.query(
                     'INSERT INTO todos (name, done, UID) VALUES (?, ?, ?) ' +

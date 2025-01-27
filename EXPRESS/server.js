@@ -18,4 +18,4 @@ app.use('/users', users);
 const todos = require('./routes/todos');
 app.use('/todos', todos);
 
-app.listen(process.env.SERVER_PORT);
+app.listen(process.env.SERVER_PORT || 3000);

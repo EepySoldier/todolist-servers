@@ -9,7 +9,7 @@ router.post('/login', (req, res) => {
 
     pool.query(
         'SELECT id FROM users WHERE username = ? AND password = ?',
-        [username.toString().toLowerCase(), password.toString().toLowerCase()],
+        [username.toLowerCase(), password],
         (err, rows) => {
             if (err) {
                 console.error(err);
@@ -40,9 +40,5 @@ router.post('/login', (req, res) => {
         }
     );
 });
-
-router.post('/logout', (req, res) => {
-
-})
 
 module.exports = router;

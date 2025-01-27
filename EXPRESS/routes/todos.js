@@ -1,10 +1,12 @@
 const express = require('express');
 const router = express.Router();
+const jwt = require("jsonwebtoken");
 
 const pool = require('../database');
 
-router.post('/save', (req, res) => {
-    const { todos, UID } = req.body;
+router.post('/save', authenticateToken, (req, res) => {
+    const { todos } = req.body;
+    const UID = req.user.uid;
 
     pool.getConnection((err, connection) => {
         if (err) {
@@ -49,5 +51,18 @@ router.post('/save', (req, res) => {
         });
     });
 });
+
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if(token == null) return res.sendStatus(401);
+
+    jwt.verify(token, process.env.TOKEN_SECRET, (err, user) => {
+        if (err) return res.sendStatus(403);
+
+        req.user = user;
+        next();
+    })
+}
 
 module.exports = router;

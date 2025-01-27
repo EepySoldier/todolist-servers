@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const jwt = require('jsonwebtoken');
 
 const pool = require('../database');
 
@@ -28,12 +29,20 @@ router.post('/login', (req, res) => {
                             return res.status(500).send('Database error while fetching todos');
                         }
 
-                        res.send({ success: true, todos, uid: userId });
+                        const user = {username: username, uid: userId}
+
+                        const accessToken = jwt.sign(user, process.env.TOKEN_SECRET, {expiresIn: '5m'})
+
+                        res.send({ success: true, todos, accessToken: accessToken });
                     }
                 );
             }
         }
     );
 });
+
+router.post('/logout', (req, res) => {
+
+})
 
 module.exports = router;

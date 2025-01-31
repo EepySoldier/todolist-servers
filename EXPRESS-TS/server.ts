@@ -1,8 +1,8 @@
 require('dotenv').config();
 import express, { Express, Request, Response } from "express";
 import cors from 'cors';
-import users from './routes/users'
-import todos from './routes/todos'
+import users from './src/routes/users'
+import todos from './src/routes/todos'
 const app: Express = express();
 
 app.use(cors({

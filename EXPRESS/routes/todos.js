@@ -10,69 +10,149 @@ router.get('/fetch', authenticateToken, (req, res) => {
     pool.query(
         'SELECT name, done FROM todos WHERE UID = ?',
         [UID],
-        (err, rows) => {
+        (err, result) => {
             if (err) {
-                console.error(err);
-                return res.status(500).send('Error fetching todos');
+                console.error(`Error while fetching todos: ${err}`);
+                res.status(500).json({ error: "Internal server error." });
+                return;
             }
-            res.send({ todos: rows });
+            res.json({ todos: result });
         }
     );
 })
 
-router.post('/save', authenticateToken, (req, res) => {
-    const { todos } = req.body;
+router.post('/add', authenticateToken, (req, res) => {
+    const { name } = req.body;
     const UID = req.user.uid;
 
-    pool.getConnection((err, connection) => {
-        if (err) {
-            return res.status(500).send('Error getting database connection');
-        }
+    if (!name) {
+        return res.status(400).json({ error: "Invalid Request" });
+    }
 
-        connection.beginTransaction((err) => {
-            if (err) {
-                connection.release();
-                return res.status(500).send('Error starting transaction');
-            }
-
-            todos.forEach(([todoName, done]) => {
-                connection.query(
-                    'INSERT INTO todos (name, done, UID) VALUES (?, ?, ?) ' +
-                    'ON DUPLICATE KEY UPDATE done = VALUES(done)',
-                    [todoName, done, UID],
-                    (err) => {
-                        if (err) {
-                            connection.rollback(() => {
-                                connection.release();
-                                return res.status(500).send('Error inserting/updating todo');
-                            });
-                        }
-                    }
-                );
-            });
-
-            connection.commit((err) => {
+    try {
+        pool.query(
+            'INSERT INTO todos (name, done, UID) VALUES (?, ?, ?)',
+            [name, false, UID],
+            (err) => {
                 if (err) {
-                    connection.rollback(() => {
-                        connection.release();
-                        return res.status(500).send('Error committing transaction');
-                    });
+                    console.error(`Error while adding todo: ${err}`);
+                    res.status(500).json({ error: "Internal server error." });
+                    return;
                 }
+                res.json({ message: "Added todo."});
+            }
+        );
+    } catch (error) {
+        console.error(`Error while adding todo: ${error}`);
+        res.status(500).json({ error: "Internal server error." });
+    }
+});
 
-                connection.release();
-                res.send({ message: 'Todos saved successfully' });
-            });
-        });
-    });
+router.patch('/update', authenticateToken, (req, res) => {
+    const { oldName, newName } = req.body;
+    const UID = req.user.uid;
+
+    if (!oldName || !newName) {
+        return res.status(400).json({ error: "Invalid Request" });
+    }
+
+    try {
+        pool.query(
+            'UPDATE todos SET name = ? WHERE name = ? AND UID = ?',
+            [newName, oldName, UID],
+            (err, result) => {
+                if (err) {
+                    console.error(`Error updating todo name: ${err}`);
+                    res.status(500).json({ error: "Internal server error." });
+                    return;
+                }
+                if (result.affectedRows === 0) {
+                    return res.status(404).json({ error: "Todo not found." });
+                }
+                res.json({ message: "Todo updated." });
+            }
+        );
+    } catch (error) {
+        console.error(`Error updating todo name: ${error}`);
+        res.status(500).json({ error: "Internal server error." });
+    }
+});
+
+router.delete('/delete', authenticateToken, (req, res) => {
+    const { name } = req.query;
+    const UID = req.user.uid;
+
+    if (!name) {
+        return res.status(400).json({ error: "Invalid Request" });
+    }
+
+    try {
+        pool.query(
+            'DELETE FROM todos WHERE name = ? AND UID = ?',
+            [name, UID],
+            (err, result) => {
+                if (err) {
+                    console.error(`Error while deleting todo: ${err}`);
+                    res.status(500).json({ error: "Internal server error." });
+                    return;
+                }
+                if (result.affectedRows === 0) {
+                    res.status(404).json({ error: "Todo not found." });
+                    return;
+                }
+                res.json({ message: "Todo deleted." });
+            }
+        );
+    } catch (error) {
+        console.error(`Error while deleting todo: ${error}`);
+        res.status(500).json({ error: "Internal server error." });
+    }
+});
+
+router.patch('/toggle', authenticateToken, (req, res) => {
+    const { name, done } = req.body;
+    const UID = req.user.uid;
+
+    if (typeof done !== 'boolean' || !name) {
+        res.status(400).json({ error: "Invalid request" });
+        return;
+    }
+
+    try {
+        pool.query(
+            'UPDATE todos SET done = ? WHERE name = ? AND UID = ?',
+            [done, name, UID],
+            (err, result) => {
+                if (err) {
+                    console.error(`Error while toggling todo ${err}`);
+                    res.status(500).json({ error: "Internal server error." });
+                    return;
+                }
+                if (result.affectedRows === 0) {
+                    res.status(404).json({ error: "Todo not found." });
+                    return;
+                }
+                res.json({ message: "Todo toggled." });
+            }
+        );
+    } catch (error) {
+        console.error(`Error while toggling todo ${error}`);
+        res.status(500).json({ error: "Internal server error." });
+    }
 });
 
 function authenticateToken(req, res, next) {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    if (!token) return res.status(401).send({ error: 'Token missing' });
+    const token = req.headers['authorization'];
+    if (!token){
+        res.status(401).json({ error: 'Token missing' });
+        return;
+    }
 
     jwt.verify(token, process.env.TOKEN_SECRET, (err, user) => {
-        if (err) return res.status(403).send({ error: 'Invalid or expired token' });
+        if (err){
+            res.status(403).json({ error: 'Invalid or expired token' });
+            return;
+        }
         req.user = user;
         next();
     });
